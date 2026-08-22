@@ -1,18 +1,16 @@
 use bevy::prelude::*;
 use bevy::asset::AssetPlugin;
-use states::AppState;
-use navigation::NavStack;
+use config::states::AppState;
+use config::navigation::NavStack;
 use bevy_html_tailwind::HtmlTailwindPlugin; 
 
-mod menu;
-mod panels;
+
 mod simulation_2d;
 mod simulation_3d;
-mod navigation;
-mod states;
-mod setup; 
+mod config;
+mod ui;
 
-use setup::SetupConfig;
+use config::setup::SetupConfig;
 
 fn main() {
     App::new()
@@ -24,9 +22,9 @@ fn main() {
         .insert_resource(NavStack::default())
         .insert_resource(SetupConfig::default()) 
         
-        .add_plugins(menu::MenuPlugin)
         .add_plugins(simulation_2d::Simulation2dPlugin)
         .add_plugins(simulation_3d::Simulation3dPlugin)
-        .add_plugins(panels::UiPanelPlugin)
+        .add_plugins(ui::UiPlugin)
+        .add_plugins(config::ConfigPlugin)
         .run();
 }

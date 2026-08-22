@@ -1,45 +1,15 @@
 use bevy::prelude::*;
 use bevy::input::mouse::AccumulatedMouseScroll;
 use std::fs;
-use std::path::Path;
-use crate::states::AppState;
-use crate::navigation::{NavStack, push_state};
+
+use crate::config::states::AppState;
+use crate::config::navigation::{NavStack, push_state};
 use crate::simulation_2d::SimulationState;
-use crate::setup::{SetupConfig, SelectionItem, ConfigCategory};
-
-pub struct MenuPlugin;
-
-impl Plugin for MenuPlugin {
-    fn build(&self, app: &mut App) {
-        app.init_resource::<ActiveDropdown>()
-           .add_systems(OnEnter(AppState::MainMenu), setup_main_menu)
-           .add_systems(Update, handle_main_menu_buttons.run_if(in_state(AppState::MainMenu)))
-           .add_systems(OnExit(AppState::MainMenu), cleanup_menu::<MainMenuEntity>)
-           
-           .add_systems(OnEnter(AppState::AlgorithmSelection2D), setup_algo_menu)
-           .add_systems(Update, (
-               handle_dropdown_toggle,
-               handle_selection_input,
-               handle_start_button,
-               update_selection_buttons,
-               update_start_button_visual,
-               handle_scroll,
-               update_dropdown_visibility,
-               update_dropdown_labels,
-           ).run_if(in_state(AppState::AlgorithmSelection2D)))
-           
-           .add_systems(OnExit(AppState::AlgorithmSelection2D), cleanup_menu::<AlgoMenuEntity>);
-    }
-}
-
-#[derive(Resource, Default)]
-struct ActiveDropdown(Option<ConfigCategory>);
+use crate::config::setup::{SetupConfig, SelectionItem, ConfigCategory};
+use super::{ActiveDropdown, get_files};
 
 #[derive(Component)]
-struct MainMenuEntity;
-
-#[derive(Component)]
-struct AlgoMenuEntity;
+pub(crate) struct AlgoMenuEntity;
 
 #[derive(Component)]
 struct StartButton;
@@ -54,68 +24,9 @@ struct DropdownContainer(ConfigCategory);
 struct DropdownLabel(ConfigCategory);
 
 #[derive(Component)]
-enum MenuAction { Play2D, Play3D }
-
-#[derive(Component)]
 struct ScrollableList {
     position: f32,
     max_scroll: f32,
-}
-
-fn get_files(path: &str, ext: &str) -> Vec<String> {
-    let mut files = Vec::new();
-    if let Ok(entries) = fs::read_dir(path) {
-        for entry in entries.flatten() {
-            if let Ok(ft) = entry.file_type() {
-                if ft.is_file() {
-                    let name = entry.file_name().into_string().unwrap_or_default();
-                    if name.ends_with(ext) { files.push(name); }
-                }
-            }
-        }
-    }
-    files.sort();
-    files
-}
-
-fn setup_main_menu(mut commands: Commands) {
-    commands.spawn((Camera2d, MainMenuEntity));
-
-    commands.spawn((
-        Node {
-            width: Val::Percent(100.0),
-            height: Val::Percent(100.0),
-            justify_content: JustifyContent::Center,
-            align_items: AlignItems::Center,
-            flex_direction: FlexDirection::Column,
-            row_gap: Val::Px(25.0),
-            ..default()
-        },
-        BackgroundColor(Color::srgb(0.1, 0.1, 0.12)),
-        MainMenuEntity,
-    )).with_children(|parent| {
-        parent.spawn((Text::new("BawalPathFinder"), TextFont { font_size: 45.0, ..default() }, TextColor(Color::WHITE)));
-        
-        parent.spawn((
-            Button,
-            Node { width: Val::Px(250.0), height: Val::Px(60.0), justify_content: JustifyContent::Center, align_items: AlignItems::Center, border: UiRect::all(Val::Px(2.0)), ..default() },
-            BackgroundColor(Color::srgb(0.2, 0.4, 0.8)), BorderColor::all(Color::srgb(0.4, 0.6, 1.0)), MenuAction::Play2D,
-        )).with_children(|btn| { btn.spawn((Text::new("2D SIMULATION"), TextFont { font_size: 20.0, ..default() }, TextColor(Color::WHITE))); });
-        
-        parent.spawn((
-            Button,
-            Node { width: Val::Px(250.0), height: Val::Px(60.0), justify_content: JustifyContent::Center, align_items: AlignItems::Center, border: UiRect::all(Val::Px(2.0)), ..default() },
-            BackgroundColor(Color::srgb(0.2, 0.8, 0.4)), BorderColor::all(Color::srgb(0.4, 1.0, 0.6)), MenuAction::Play3D,
-        )).with_children(|btn| { btn.spawn((Text::new("3D SIMULATION"), TextFont { font_size: 20.0, ..default() }, TextColor(Color::WHITE))); });
-    });
-}
-
-fn handle_main_menu_buttons(mut next_state: ResMut<NextState<AppState>>, interaction_query: Query<(&Interaction, &MenuAction), (Changed<Interaction>, With<Button>)>) {
-    for (interaction, action) in &interaction_query {
-        if *interaction == Interaction::Pressed {
-            match action { MenuAction::Play2D => next_state.set(AppState::AlgorithmSelection2D), MenuAction::Play3D => next_state.set(AppState::Sim3D), }
-        }
-    }
 }
 
 macro_rules! render_dropdown {
@@ -183,7 +94,7 @@ macro_rules! render_dropdown {
     };
 }
 
-fn setup_algo_menu(mut commands: Commands, mut active_dropdown: ResMut<ActiveDropdown>) {
+pub(crate) fn setup_algo_menu(mut commands: Commands, mut active_dropdown: ResMut<ActiveDropdown>) {
     active_dropdown.0 = None;
     commands.spawn((Camera2d, AlgoMenuEntity));
 
@@ -218,7 +129,7 @@ fn setup_algo_menu(mut commands: Commands, mut active_dropdown: ResMut<ActiveDro
     });
 }
 
-fn handle_dropdown_toggle(mut active_dropdown: ResMut<ActiveDropdown>, query: Query<(&Interaction, &DropdownToggle), Changed<Interaction>>) {
+pub(crate) fn handle_dropdown_toggle(mut active_dropdown: ResMut<ActiveDropdown>, query: Query<(&Interaction, &DropdownToggle), Changed<Interaction>>) {
     for (interaction, toggle) in &query {
         if *interaction == Interaction::Pressed {
             if active_dropdown.0 == Some(toggle.0) { active_dropdown.0 = None; } 
@@ -227,7 +138,7 @@ fn handle_dropdown_toggle(mut active_dropdown: ResMut<ActiveDropdown>, query: Qu
     }
 }
 
-fn update_dropdown_visibility(active_dropdown: Res<ActiveDropdown>, mut query: Query<(&mut Node, &DropdownContainer)>) {
+pub(crate) fn update_dropdown_visibility(active_dropdown: Res<ActiveDropdown>, mut query: Query<(&mut Node, &DropdownContainer)>) {
     if active_dropdown.is_changed() {
         for (mut node, container) in &mut query {
             if active_dropdown.0 == Some(container.0) { node.display = Display::Flex; } 
@@ -236,7 +147,7 @@ fn update_dropdown_visibility(active_dropdown: Res<ActiveDropdown>, mut query: Q
     }
 }
 
-fn update_dropdown_labels(config: Res<SetupConfig>, mut query: Query<(&mut Text, &DropdownLabel)>) {
+pub(crate) fn update_dropdown_labels(config: Res<SetupConfig>, mut query: Query<(&mut Text, &DropdownLabel)>) {
     if config.is_changed() {
         for (mut text, label) in &mut query {
             match label.0 {
@@ -257,7 +168,7 @@ fn update_dropdown_labels(config: Res<SetupConfig>, mut query: Query<(&mut Text,
     }
 }
 
-fn handle_scroll(mouse_scroll: Res<AccumulatedMouseScroll>, mut query_list: Query<(&mut ScrollableList, &mut Node, &Interaction)>) {
+pub(crate) fn handle_scroll(mouse_scroll: Res<AccumulatedMouseScroll>, mut query_list: Query<(&mut ScrollableList, &mut Node, &Interaction)>) {
     if mouse_scroll.delta.y != 0.0 {
         for (mut scroll, mut node, interaction) in &mut query_list {
             if *interaction == Interaction::Hovered {
@@ -270,7 +181,7 @@ fn handle_scroll(mouse_scroll: Res<AccumulatedMouseScroll>, mut query_list: Quer
     }
 }
 
-fn handle_selection_input(mut config: ResMut<SetupConfig>, mut active_dropdown: ResMut<ActiveDropdown>, query: Query<(&Interaction, &SelectionItem), Changed<Interaction>>) {
+pub(crate) fn handle_selection_input(mut config: ResMut<SetupConfig>, mut active_dropdown: ResMut<ActiveDropdown>, query: Query<(&Interaction, &SelectionItem), Changed<Interaction>>) {
     for (interaction, item) in &query {
         if *interaction == Interaction::Pressed {
             match item.category {
@@ -283,7 +194,7 @@ fn handle_selection_input(mut config: ResMut<SetupConfig>, mut active_dropdown: 
     }
 }
 
-fn update_selection_buttons(config: Res<SetupConfig>, mut query: Query<(&SelectionItem, &mut BackgroundColor, &mut BorderColor)>) {
+pub(crate) fn update_selection_buttons(config: Res<SetupConfig>, mut query: Query<(&SelectionItem, &mut BackgroundColor, &mut BorderColor)>) {
     for (item, mut bg_color, mut border) in &mut query {
         let is_selected = match item.category { ConfigCategory::Algorithm => config.algorithm == item.value, ConfigCategory::Map => config.map_name == item.value, ConfigCategory::Urdf => config.urdf_model == item.value, };
         if is_selected {
@@ -294,7 +205,7 @@ fn update_selection_buttons(config: Res<SetupConfig>, mut query: Query<(&Selecti
     }
 }
 
-fn update_start_button_visual(config: Res<SetupConfig>, mut query: Query<(&mut BackgroundColor, &mut BorderColor), With<StartButton>>) {
+pub(crate) fn update_start_button_visual(config: Res<SetupConfig>, mut query: Query<(&mut BackgroundColor, &mut BorderColor), With<StartButton>>) {
     let is_ready = !config.algorithm.is_empty() && !config.map_name.is_empty() && !config.urdf_model.is_empty();
     for (mut bg_color, mut border) in &mut query {
         if is_ready { *bg_color = BackgroundColor(Color::srgb(0.1, 0.7, 0.2)); *border = BorderColor::all(Color::srgb(0.2, 0.9, 0.3));
@@ -335,7 +246,13 @@ fn inject_map_to_yaml(map_name: &str) {
     }
 }
 
-fn handle_start_button(config: Res<SetupConfig>, mut next_state: ResMut<NextState<AppState>>, mut sim_state: ResMut<SimulationState>, mut nav_stack: ResMut<NavStack>, interaction: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>) {
+pub(crate) fn handle_start_button(
+    config: Res<SetupConfig>, 
+    mut next_state: ResMut<NextState<AppState>>, 
+    mut sim_state: ResMut<SimulationState>, 
+    mut nav_stack: ResMut<NavStack>, 
+    interaction: Query<&Interaction, (Changed<Interaction>, With<StartButton>)>
+) {
     for interaction in &interaction {
         if *interaction == Interaction::Pressed {
             if config.algorithm.is_empty() || config.map_name.is_empty() || config.urdf_model.is_empty() { return; }
@@ -346,8 +263,4 @@ fn handle_start_button(config: Res<SetupConfig>, mut next_state: ResMut<NextStat
             push_state(AppState::AlgorithmSelection2D, AppState::Sim2DLoading, &mut next_state, &mut nav_stack);
         }
     }
-}
-
-fn cleanup_menu<T: Component>(mut commands: Commands, query: Query<Entity, With<T>>) {
-    for entity in query.iter() { commands.entity(entity).despawn(); }
 }

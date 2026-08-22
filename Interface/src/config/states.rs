@@ -8,5 +8,8 @@ pub enum AppState {
     Sim2DLoading,
     Sim2DLog,
     Sim2DRun,
+    AlgorithmSelection3D,
     Sim3D,
+    Sim3DLog,
+    Sim3DRun,
 }

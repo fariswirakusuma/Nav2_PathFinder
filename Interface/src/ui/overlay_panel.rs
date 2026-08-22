@@ -1,14 +1,13 @@
 use bevy::prelude::*;
 use bevy::input::mouse::{MouseScrollUnit, MouseWheel};
-use crate::simulation_2d::{SimulationState, PlannerLog, RosBridge};
-use crate::states::AppState;
-use crate::setup::SetupConfig;
 use std::fs;
 
-pub struct UiPanelPlugin;
+use crate::simulation_2d::{SimulationState, PlannerLog, RosBridge};
+// use crate::config::states::AppState;
+use crate::config::setup::SetupConfig;
 
 #[derive(Component)]
-struct PanelEntity;
+pub(crate) struct PanelEntity;
 
 #[derive(Component)]
 struct StatsText;
@@ -24,18 +23,7 @@ struct ScrollingList {
     position: f32,
 }
 
-impl Plugin for UiPanelPlugin {
-    fn build(&self, app: &mut App) {
-        app.add_systems(OnEnter(AppState::Sim2DRun), setup_panel)
-           .add_systems(
-               Update,
-               (update_panel_stats, handle_reset_button, manual_mouse_scroll).run_if(in_state(AppState::Sim2DRun)),
-           )
-           .add_systems(OnExit(AppState::Sim2DRun), cleanup_panel);
-    }
-}
-
-fn setup_panel(mut commands: Commands) {
+pub(crate) fn setup_panel(mut commands: Commands) {
     commands.spawn((
         Node {
             width: Val::Percent(100.0),
@@ -166,21 +154,19 @@ fn setup_panel(mut commands: Commands) {
     });
 }
 
-fn manual_mouse_scroll(
+pub(crate) fn manual_mouse_scroll(
     keyboard_input: Res<ButtonInput<KeyCode>>,
     mut mouse_wheel_messages: MessageReader<MouseWheel>, 
     mut query_list: Query<(&mut ScrollingList, &mut Node)>,
 ) {
     let mut dy = 0.0;
     
-    // 1. Eksekusi Input Keyboard
     if keyboard_input.pressed(KeyCode::ArrowUp) {
         dy += 25.0; 
     } else if keyboard_input.pressed(KeyCode::ArrowDown) {
         dy -= 25.0; 
     }
 
-    // 2. Eksekusi Input Mouse Wheel dari Messages
     for message in mouse_wheel_messages.read() {
         match message.unit {
             MouseScrollUnit::Line => dy += message.y * 20.0,
@@ -199,7 +185,7 @@ fn manual_mouse_scroll(
     }
 }
 
-fn update_panel_stats(
+pub(crate) fn update_panel_stats(
     state: Res<SimulationState>,
     planner_log: Res<PlannerLog>,
     config: Res<SetupConfig>,
@@ -263,8 +249,7 @@ fn update_panel_stats(
         **text = log_text;
     }
 }
-
-fn handle_reset_button(
+pub(crate) fn handle_reset_button(
     mut interaction_query: Query<
         (&Interaction, &mut BackgroundColor, &mut BorderColor),
         (Changed<Interaction>, With<ResetButton>),
@@ -308,11 +293,5 @@ fn handle_reset_button(
                 *border = BorderColor::all(Color::srgb(0.9, 0.4, 0.4));
             }
         }
-    }
-}
-
-fn cleanup_panel(mut commands: Commands, query: Query<Entity, With<PanelEntity>>) {
-    for entity in query.iter() {
-        commands.entity(entity).despawn();
     }
 }

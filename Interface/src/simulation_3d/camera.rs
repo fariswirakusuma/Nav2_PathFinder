@@ -2,7 +2,7 @@
 use bevy::camera::*;
 use bevy::prelude::*;
 use bevy::input::mouse::MouseMotion;
-pub use wgpu;
+// pub use wgpu;
 
 
 #[derive(Component)]

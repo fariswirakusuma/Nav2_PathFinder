@@ -7,9 +7,9 @@ use std::fs;
 use tungstenite::{connect, Message};
 use url::Url;
 
-use crate::states::AppState;
-use crate::navigation::{NavStack, pop_state};
-use crate::setup::SetupConfig;
+use crate::config::states::AppState;
+use crate::config::navigation::{NavStack, pop_state};
+use crate::config::setup::SetupConfig;
 
 pub mod message;
 use self::message::{SimulationPayload, MapSize, Point2D, StepLog};
