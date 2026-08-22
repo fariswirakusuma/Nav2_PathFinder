@@ -17,5 +17,6 @@ pub fn generate_urdf_to_workspace(selected_filename: &str) -> std::io::Result<()
 }
 
 pub fn parse_and_animate_robot(){
-
+    
+     
 }
